@@ -124,7 +124,7 @@ def placeOrder(order_dict):
         account=ACCOUNT_NUMBER, fields=["positions", "orders"]
     )
     print(account_details)
-    return {"state": False, "err": "Its a test!"}
+    # return {"state": False, "err": "Its a test!"}
 
     if "BUY" in side:
         balance = account_details["securitiesAccount"]["projectedBalances"][
