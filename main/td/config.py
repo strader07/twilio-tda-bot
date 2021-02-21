@@ -1,18 +1,26 @@
+import pandas as pd
 
-USERNAME = "tdacctesting" # same as username   #sometimes as account number
-PASSWORD = "testTest1" 
-ACCOUNT_NUMBER = '496903789'
-REDIRECT_URI = 'http://localhost'
+df = pd.read_csv("config/config.csv")
 
-CLIENT_ID = "DK5KTNJMHJOWP3WSNSZEXTDWDFNWNMAE" # the same as client_id or consumer_key or apikey
+USERNAME = df[df["fields"]=="USERNAME"].iloc[0]["values"]
+PASSWORD = df[df["fields"]=="PASSWORD"].iloc[0]["values"]
+ACCOUNT_NUMBER = str(df[df["fields"]=="ACCOUNT_NUMBER"].iloc[0]["values"])
+REDIRECT_URI = df[df["fields"]=="REDIRECT_URI"].iloc[0]["values"]
 
-question1 = " What is your maternal grandmother\'s first name?"
-question2 = " In what city were you married? (Enter full name of city only.)"
-question3 = " In what city were you born? (Enter full name of city only.)"
-question4 = " What was your favorite restaurant in college?"
+CLIENT_ID = df[df["fields"]=="CLIENT_ID"].iloc[0]["values"]
 
-myanswer1 = 'Karen'
-myanswer2 = 'Paris'
-myanswer3 = 'Tokyo'
-myanswer4 = 'Falafel'
+question1 = df[df["fields"]=="question1"].iloc[0]["values"]
+question2 = df[df["fields"]=="question2"].iloc[0]["values"]
+question3 = df[df["fields"]=="question3"].iloc[0]["values"]
+question4 = df[df["fields"]=="question4"].iloc[0]["values"]
 
+myanswer1 = df[df["fields"]=="myanswer1"].iloc[0]["values"]
+myanswer2 = df[df["fields"]=="myanswer2"].iloc[0]["values"]
+myanswer3 = df[df["fields"]=="myanswer3"].iloc[0]["values"]
+myanswer4 = df[df["fields"]=="myanswer4"].iloc[0]["values"]
+
+twilio_sid = "ACd158e4f056a19875e54b1d64806dacfa"
+twilio_auth = "3251b7fc5c834cd8d25aa26d8a4c7489"
+twilio_number = "+16789213470"
+
+broadcast_numbers = "+14028198102,+14045529199"

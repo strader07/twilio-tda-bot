@@ -5,11 +5,12 @@ from django.http import HttpResponse, JsonResponse
 from django import template
 
 from main.td.client import TDClient
-from main.td.config import ACCOUNT_NUMBER, PASSWORD, CLIENT_ID, REDIRECT_URI
+from main.td.config import *
 from main.td.orders import Order, OrderLeg
 from main.td.enums import ORDER_SESSION, DURATION, ORDER_INSTRUCTIONS, ORDER_ASSET_TYPE
 
 from twilio.twiml.messaging_response import Message, MessagingResponse
+from twilio.rest import Client
 from django.views.decorators.csrf import csrf_exempt
 
 from datetime import datetime
@@ -55,11 +56,19 @@ def placeOrder(order_dict):
         side = "SELL_TO_CLOSE"
 
     account_details = TDSession.get_accounts(account=ACCOUNT_NUMBER, fields=["positions", "orders"])
-    if "BUY" in side:
-        balance = account_details["securitiesAccount"]["currentBalances"]["cashAvailableForTrading"]
-        quote = TDSession.get_quotes(instruments = [symbol])
 
-        askPrice = quote[symbol]["askPrice"]
+    if "BUY" in side:
+        balance = account_details["securitiesAccount"]["projectedBalances"]["availableFunds"]
+        quote = TDSession.get_quotes(instruments = [symbol])
+        print(balance)
+        try:
+            multiplier = int(float(quote[symbol]["multiplier"]))
+        except:
+            multiplier = 1
+        if multiplier < 1:
+            multiplier = 1
+
+        askPrice = quote[symbol]["askPrice"]/multiplier
         smsPrice = order_dict["price"]
         priceDiff = int((askPrice - smsPrice) / smsPrice * 100)
         if priceDiff > 5:
@@ -69,24 +78,30 @@ def placeOrder(order_dict):
             size = int(250/askPrice)
         else:
             size = int(balance/askPrice)
-        if size != 0:
+        if size == 0:
             return {"state":False, "err": "Insufficient Funds!"}
 
     if "SELL" in side:
-        try:
-            positions = account_details["positions"]
-            size = 0
-            for position in positions:
-                if position["instrument"]["symbol"] == symbol:
-                    size = size + position["longQuantity"]
-        except Exception as e:
-            print(e)
-            return {"state":False, "err": "Trade can't be found."}
+        if assetType == "OPTION":
+            size = 1
+        else:
+            try:
+                positions = account_details["securitiesAccount"]["positions"]
+                size = 0
+                for position in positions:
+                    if position["instrument"]["symbol"] == symbol:
+                        size = size + position["longQuantity"]
+            except Exception as e:
+                print(e)
+                return {"state":False, "err": "Trade can't be found."}
 
         if size == 0:
             return {"state":False, "err": "Trade can't be found."}
 
     # Initalize a new Order Object.
+    if assetType == "OPTION":
+        size = 1
+
     newOrder = {
         "complexOrderStrategyType": "NONE",
         "orderType": "MARKET",
@@ -105,8 +120,17 @@ def placeOrder(order_dict):
         ]
     }
 
-    # order_status = TDSession.place_order(account = ACCOUNT_NUMBER, order = newOrder)
-    return {"state":True, "order": newOrder}
+    print(newOrder)
+
+    try:
+        order_result = TDSession.place_order(account = ACCOUNT_NUMBER, order = newOrder)
+        if order_result["orderStatus"] == "success":
+            return {"state":True, "order": order_result["order"]}
+        else:
+            return {"state":False, "err": "Unknown"}
+        print("KO")
+    except Exception as e:
+        return {"state":False, "err": e}
 
 
 def process_messages(message0):
@@ -153,8 +177,8 @@ def process_messages(message0):
                 if item > symbol:
                     symbol = item
                     break
-        if item == symbols[-1] and item != symbol:
-            return {"canTrade": False, "err": "The symbol is unknown.", "symbol": ticker}
+            if item == symbols[-1] and item != symbol:
+                return {"canTrade": False, "err": "The symbol is unknown.", "symbol": ticker}
 
     if secType == "EQUITY":
         symbol = ticker
@@ -181,28 +205,50 @@ def process_messages(message0):
 @csrf_exempt
 def get_bot_triggers(request):
 
+    print("OK")
+
     if request.method == 'POST':
         num = request.POST.get('From')
         message = request.POST.get('Body')
 
         result = process_messages(message)
+        print(result)
+
+        resp = MessagingResponse()
+        client = Client(twilio_sid, twilio_auth)
+        _from = twilio_number
+        _tos = [item.strip(",. ") for item in broadcast_numbers.split(",")]
+
         symbol = result["symbol"]
         if not result["canTrade"]:
-            resp = MessagingResponse()
             err_msg = result["err"]
-            resp.message(f"\nHello {num}, Trade [{symbol}] failed.\n Reason: {err_msg}\n Your sms: {message}")
-            return HttpResponse(str(resp))
+            msg = f"\n\nHello,\nTrade [{symbol}] failed.\n Reason: {err_msg}\n Your sms: {message}"
+            resp.message(msg)
+            for _to in _tos:
+                client.messages.create(to=_to,
+                                       from_=_from,
+                                       body=msg)
+            return HttpResponse("Message delivered")
 
         order_result = placeOrder(result["order"])
         if not order_result["state"]:
-            resp = MessagingResponse()
             err_msg = order_result["err"]
-            resp.message(f"\nHello {num}, Trade [{symbol}] failed.\n Reason: {err_msg}\n Your sms: {message}")
-            return HttpResponse(str(resp))
+            msg = f"\n\nHello,\nTrade [{symbol}] failed.\n Reason: {err_msg}\n Your sms: {message}"
+            resp.message(msg)
+            for _to in _tos:
+                client.messages.create(to=_to,
+                                       from_=_from,
+                                       body=msg)
+            return HttpResponse("Message delivered")
 
-        resp = MessagingResponse()
-        resp.message(f"\nHello {num}, Trade [{symbol}] executed.\n Your order details: \n")
-        return HttpResponse(str(resp))
+        msg = f"\n\nHello,\nTrade [{symbol}] executed.\n Your sms: {message}\n Your order details: \n{order_result['order']}"
+        resp.message(msg)
+        for _to in _tos:
+                client.messages.create(to=_to,
+                                       from_=_from,
+                                       body=msg)
+        return HttpResponse("Message delivered")
 
     if request.method == 'GET':
         return redirect('/')
+

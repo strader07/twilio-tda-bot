@@ -1927,7 +1927,7 @@ class TDClient():
         if response.status_code == 201 or response.status_code == 200:
             return {'orderStatus': 'success', 'order': myOrder}
         else:
-            return response.json()
+            return {'orderStatus': 'fail', 'status_code': response.status_code}
 
     def _create_token_timestamp(self, token_timestamp = None):
         '''
@@ -2012,6 +2012,7 @@ class TDClient():
         streaming_session = TDStreamerClient(websocket_url = socket_url, user_principal_data = userPrincipalsResponse, credentials = credentials)
 
         return streaming_session
+
 
 
 
