@@ -33,6 +33,7 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
+    'main',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -52,6 +53,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'twilio_td.urls'
+MESSAGE_STORAGE = 'django.contrib.messages.storage.cookie.CookieStorage'
+LOGIN_REDIRECT_URL = "home"   # Route defined in main/urls.py
+LOGOUT_REDIRECT_URL = "home"  # Route defined in main/urls.py
 
 TEMPLATE_DIR = os.path.join(BASE_DIR, "twilio_td/templates")
 TEMPLATES = [
@@ -121,6 +125,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Extra places for collectstatic to find static files.
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'twilio_td/static'),
+)
 
 MEDIA_URL = '/upload/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'twilio_td/uploads')
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

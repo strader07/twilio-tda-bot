@@ -10,6 +10,7 @@ urlpatterns = [
     re_path(r'^.*\.html', views.pages, name='pages'),
 
     path('', views.index, name='home'),
+    path('save_setting/', views.save_setting, name='save_setting'),
     path('bot/', views.get_bot_triggers, name='bot')
 ]
 

@@ -1,1 +1,235 @@
-<h1 align="center">Your bot is running OKAY!</h1>
+{% extends 'layouts/base.html' %}
+
+{% load static %}
+
+{% block title %} Dashboard {% endblock title %}
+
+<!-- Specific CSS goes HERE -->
+{% block stylesheets %}
+
+<style type="text/css">
+
+</style>
+
+{% endblock stylesheets %}
+
+{% block content %}
+
+    <!-- Header -->
+    <div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+      <div class="container-fluid">
+        <div class="header-body">
+          {% for message in messages %}
+          {% if message.tags == 'error' %}
+          <div class="toast notification alert alert-danger alert-dismissible border-0 fade show" role="alert" data-delay="3000">
+          
+            <span class="alert-icon border-0"><i class="ni ni-like-2"></i></span>
+            <span class="alert-text border-0">
+              <strong>Error!</strong>&nbsp;&nbsp; {{ message }}
+            </span>
+            <button type="button" class="close" data-dismiss="toast" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          {% elif message.tags == 'info' %}
+          <div class="toast notification alert alert-info alert-dismissible border-0 fade show" role="alert" data-delay="2000">
+          
+            <span class="alert-icon border-0"><i class="ni ni-like-2"></i></span>
+            <span class="alert-text border-0">
+              <strong>Success!</strong>&nbsp;&nbsp; {{ message }}
+            </span>
+            <button type="button" class="close" data-dismiss="toast" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="container-fluid mt--7">
+
+      <div class="row">
+        <div class="col-xl-12 mb-5 mb-xl-0">
+          <div class="card bg-neutral shadow">
+            <form action="/save_setting/" method="POST" id="form_filter" onsubmit="return continueOrNot()">
+              {% csrf_token %}
+              <div class="card-header bg-transparent">
+                <div class="row align-items-center">
+                  <div class="col">
+                    <h3 class="text-primary mb-0">Trade Settings</h3>
+                  </div>
+                  <div class="col text-right">
+                    <button type="button" class="btn btn-icon btn-sm btn-primary" id="btnEditSetting">
+                      <span class="btn-inner--icon"><i class="fas fa-edit"></i></span>
+                      <span class="btn-inner--text">Edit</span>
+                    </button>
+                    <button type="submit" class="btn btn-icon btn-sm btn-primary" id="btnSaveSetting">
+                      <span class="btn-inner--icon"><i class="fas fa-save"></i></span>
+                      <span class="btn-inner--text">Save</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body">
+                  <div class="row">
+                    <div class="col-lg-6">
+                      <div class="row">
+                        <div class="form-group col-lg-12 col-md-12">
+                          <label for="num_options" class="form-control-label">Number of Options to Buy</label>
+                          {% if day_range %}
+                          <input class="form-control" type="number" value="{{ num_options }}" id="num_options" name="day_range" disabled>
+                          {% else %}
+                          <input class="form-control" type="number" value="1" id="num_options" name="num_options" disabled>
+                          {% endif %}
+                        </div>
+                        <div class="form-group col-lg-12 col-md-12">
+                          <label for="amt_options" class="form-control-label">Amount of Options to Buy</label>
+                          {% if min_swing_num %}
+                          <input class="form-control" type="number" value="{{ amt_options }}" id="amt_options" name="min_swing_num" disabled>
+                          {% else %}
+                          <input class="form-control" type="number" value="200" id="amt_options" name="amt_options" disabled>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-lg-6">
+                      <div class="row">
+                        <div class="form-group col-lg-12 col-md-12">
+                          <label for="amt_shares" class="form-control-label">Amount of Shares to Buy</label>
+                          {% if day_range %}
+                          <input class="form-control" type="number" value="{{ amt_shares }}" id="amt_shares" name="day_range" disabled>
+                          {% else %}
+                          <input class="form-control" type="number" value="200" id="amt_shares" name="amt_shares" disabled>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {% include "includes/footer.html" %}
+
+    </div>
+
+    <div class="modal fade" id="modal-form" tabindex="-1" role="dialog" aria-labelledby="modal-form" aria-hidden="true">
+        <div class="modal-dialog modal- modal-dialog-centered modal-sm" role="document">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+
+                  <div class="card bg-secondary border-0 mb-0">
+                      <div class="card-header bg-transparent">
+                          <div class="text-muted text-center mt-2 mb-2">
+                            <h3>Get Your Report!</h3>
+                          </div>
+                      </div>
+                      <div class="card-body px-lg-7 py-lg-3">
+                          <form role="form" id="reportForm" action="/report/" method="POST">
+                              {% csrf_token %}
+                              <div class="custom-control custom-control-alternative custom-checkbox pt-lg-3 pb-lg-4">
+                                  <input class="form-control custom-control-input" id="reportOpenPos" type="checkbox">
+                                  <label class="custom-control-label" for="reportOpenPos">
+                                      <span class="text-muted">Open Positions</span>
+                                  </label>
+                              </div>
+                              <div class="custom-control custom-control-alternative custom-checkbox pb-lg-4">
+                                  <input class="custom-control-input" id="reportClosedPos" type="checkbox">
+                                  <label class="custom-control-label" for="reportClosedPos">
+                                      <span class="text-muted">Closed Positions</span>
+                                  </label>
+                              </div>
+                              <div class="text-right">
+                                  <button type="submit" class="btn btn-primary btn-sm my-4" data-dismiss="modal" id="btnExport">Export</button>
+                              </div>
+                          </form>
+                      </div>
+                  </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modal-form-tradesummary" tabindex="-1" role="dialog" aria-labelledby="modal-form-tradesummary" aria-hidden="true">
+        <div class="modal-dialog modal- modal-dialog-centered modal-lg shadow" role="document">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+
+                  <div class="card bg-secondary border-0 mb-0">
+                      <div class="card-header bg-transparent">
+                          <div class="text-muted text-center mt-2 mb-2">
+                            <h3>Trade Summary!</h3>
+                          </div>
+                      </div>
+                      <form role="form" id="trade_form" action="/trade/" method="POST">
+                      {% csrf_token %}
+                          <div class="card-body pt-lg-4">
+                            <div class="table-responsive">
+                              <table class="table align-items-center table-flush">
+                                <thead class="thead">
+                                  <tr>
+                                    <th>Symbol</th>
+                                    <th>Exchange</th>
+                                    <th>Shares</th>
+                                    <th>Buy ($)</th>
+                                    <th>Sell ($)</th>
+                                    <th>Profit (%)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {% for item in trade_summary %}
+                                      <tr>
+                                        <td>{{ item.symbol }}</td>
+                                        <td>{{ item.exchange }}</td>
+                                        <td>{{ item.nShares }}</td>
+                                        <td>{{ item.buyPrice }}</td>
+                                        <td>{{ item.sellPrice }}</td>
+                                        <td>{{ item.profit }}</td>
+                                      </tr>
+                                  {% endfor %}
+                                </tbody>
+                              </table>
+                            </div>
+                            <!-- <div class="text-right">
+                                <button type="submit" class="btn btn-primary btn-sm my-4" data-dismiss="modal" id="btnExecuteTrade">Execute Trade</button>
+                            </div> -->
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-primary mt-4" id="btnExecuteTrade">Execute Trade</button>
+                            </div>
+                          </div>
+                      </form>
+                  </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}
+
+<!-- Specific JS goes HERE -->
+
+{% block javascripts %}
+<script>
+  var editBtn = document.getElementById('btnEditSetting');
+    editBtn.addEventListener('click', function(){
+      document.getElementById('num_options').disabled = false;
+      document.getElementById('amt_options').disabled = false;
+      document.getElementById('amt_shares').disabled = false;
+  });
+
+  function continueOrNot() {
+    if ((document.getElementById('num_options').disabled)||(document.getElementById('num_options').disabled)||(document.getElementById('num_options').disabled)) {
+      alert('Edit options before you save!'); return false;
+    } else { return true; }
+  }
+
+  $(function () {
+    $('.toast').toast('show');
+  });
+</script>
+{% endblock javascripts %}
