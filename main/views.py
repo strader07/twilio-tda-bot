@@ -123,15 +123,12 @@ def placeOrder(order_dict):
     account_details = TDSession.get_accounts(
         account=ACCOUNT_NUMBER, fields=["positions", "orders"]
     )
-    print(account_details)
-    # return {"state": False, "err": "Its a test!"}
-
+    balance = account_details["securitiesAccount"]["projectedBalances"][
+        "availableFunds"
+    ]
+    print("Ballance: ", balance)
     if "BUY" in side:
-        balance = account_details["securitiesAccount"]["projectedBalances"][
-            "availableFunds"
-        ]
         quote = TDSession.get_quotes(instruments=[symbol])
-        print(balance)
         try:
             multiplier = int(float(quote[symbol]["multiplier"]))
         except:
@@ -145,15 +142,31 @@ def placeOrder(order_dict):
         if priceDiff > 5:
             return {
                 "state": False,
-                "err": "Buy price or 5% higher buy price not available.",
+                "err": f"Buy price or 5% higher buy price not available. Current price: {askPrice} Balance: {balance}",
             }
 
-        if balance >= 250:
-            size = int(250 / askPrice)
+        print("askPrice:", askPrice)
+        print("smsPrice:", smsPrice)
+
+        if assetType == "OPTION":
+            amount = amt_options
+            size = int(amount / askPrice)
+            if size == 0:
+                size = num_options
         else:
-            size = int(balance / askPrice)
-        if size == 0:
-            return {"state": False, "err": "Insufficient Funds!"}
+            amount = amt_shares
+            size = int(amount / askPrice)
+            if size == 0:
+                return {
+                    "state": False,
+                    "err": f"Current price is greater than the amount of shares to buy. Current price: {askPrice} Balance: {balance}",
+                }
+        print(size, askPrice)
+        if size * askPrice > balance:
+            return {
+                "state": False,
+                "err": f"${balance} balance insufficient for ${round(size * askPrice, 2)} trade!",
+            }
 
     if "SELL" in side:
         if assetType == "OPTION":
@@ -167,15 +180,18 @@ def placeOrder(order_dict):
                         size = size + position["longQuantity"]
             except Exception as e:
                 print(e)
-                return {"state": False, "err": "Trade can't be found."}
+                return {
+                    "state": False,
+                    "err": f"Trade position not found. Balance: ${balance}",
+                }
 
         if size == 0:
-            return {"state": False, "err": "Trade can't be found."}
+            return {
+                "state": False,
+                "err": f"Trade position not found. Balance: ${balance}",
+            }
 
     # Initalize a new Order Object.
-    if assetType == "OPTION":
-        size = 1
-
     newOrder = {
         "complexOrderStrategyType": "NONE",
         "orderType": "MARKET",
@@ -192,16 +208,33 @@ def placeOrder(order_dict):
     }
 
     print(newOrder)
-
+    trade_amount = round(size * askPrice, 2)
     try:
         order_result = TDSession.place_order(account=ACCOUNT_NUMBER, order=newOrder)
+        account_details = TDSession.get_accounts(
+            account=ACCOUNT_NUMBER, fields=["positions", "orders"]
+        )
+        new_balance = account_details["securitiesAccount"]["projectedBalances"][
+            "availableFunds"
+        ]
+
         if order_result["orderStatus"] == "success":
-            return {"state": True, "order": order_result["order"]}
+            return {
+                "state": True,
+                "order": order_result["order"],
+                "success": f"${new_balance} balance after ${trade_amount} trade.",
+            }
         else:
-            return {"state": False, "err": "Unknown"}
+            return {
+                "state": False,
+                "err": f"Unknown. Balance: ${new_balance} Trade amount: ${trade_amount}",
+            }
         print("KO")
     except Exception as e:
-        return {"state": False, "err": e}
+        return {
+            "state": False,
+            "err": e + f" Balance: ${balance} Trade amount: ${trade_amount}",
+        }
 
 
 def process_messages(message0):
@@ -334,7 +367,7 @@ def get_bot_triggers(request):
                 client.messages.create(to=_to, from_=_from, body=msg)
             return HttpResponse("Message delivered")
 
-        msg = f"\n\nHello,\nTrade [{symbol}] executed.\n Your sms: {message}\n Your order details: \n{order_result['order']}"
+        msg = f"\n\nHello,\nTrade [{symbol}] executed.\n Details: {order_result['success']}\n Your sms: {message}\n Your order details: \n{order_result['order']}"
         resp.message(msg)
         for _to in _tos:
             client.messages.create(to=_to, from_=_from, body=msg)
