@@ -45,7 +45,21 @@ months = [
 
 @login_required(login_url="/login/")
 def index(request):
-    return render(request, "index.html")
+    try:
+        trade_option = TradeOptions.objects.all()[0]
+        if not trade_option:
+            messages.error(request, "Trade option not defined")
+            return render(request, "index.html")
+
+        params = {
+            "num_options": trade_option.num_options,
+            "amt_options": trade_option.amt_options,
+            "amt_shares": trade_option.amt_shares,
+        }
+    except:
+        params = {}
+        messages.error(request, "Trade option not defined")
+    return render(request, "index.html", context=params)
 
 
 @login_required(login_url="/login/")
@@ -73,24 +87,39 @@ def save_setting(request):
 
         try:
             trade_option = TradeOptions.objects.all()[0]
-            if trade_option:
-                trade_option.delete()
         except:
+            trade_option = None
             pass
 
         num_options = request.POST.get("num_options")
         amt_options = request.POST.get("amt_options")
         amt_shares = request.POST.get("amt_shares")
+        print(num_options)
+        print(amt_options)
+        print(amt_shares)
 
-        new_option = TradeOptions(
-            num_options=num_options, amt_options=amt_options, amt_shares=amt_shares
-        )
+        if trade_option:
+            if num_options:
+                trade_option.num_options = int(num_options)
+            if amt_shares:
+                trade_option.amt_shares = float(amt_shares)
+            if amt_options:
+                trade_option.amt_options = float(amt_options)
+            trade_option.save()
 
-        new_option.save()
+            messages.info(request, "Your settings successfully saved!")
+            return redirect("/")
+        else:
 
-        messages.info(request, "Your settings successfully saved!")
+            new_option = TradeOptions(
+                num_options=num_options, amt_options=amt_options, amt_shares=amt_shares
+            )
 
-        return redirect("/")
+            new_option.save()
+
+            messages.info(request, "Your settings successfully saved!")
+
+            return redirect("/")
 
     else:
         return redirect("/")
@@ -127,16 +156,18 @@ def placeOrder(order_dict):
         "availableFunds"
     ]
     print("Ballance: ", balance)
-    if "BUY" in side:
-        quote = TDSession.get_quotes(instruments=[symbol])
-        try:
-            multiplier = int(float(quote[symbol]["multiplier"]))
-        except:
-            multiplier = 1
-        if multiplier < 1:
-            multiplier = 1
+    quote = TDSession.get_quotes(instruments=[symbol])
+    try:
+        multiplier = int(float(quote[symbol]["multiplier"]))
+    except:
+        multiplier = 1
+    if multiplier < 1:
+        multiplier = 1
 
-        askPrice = quote[symbol]["askPrice"] / multiplier
+    askPrice = quote[symbol]["askPrice"] / multiplier
+    bidPrice = quote[symbol]["bidPrice"] / multiplier
+
+    if "BUY" in side:
         smsPrice = order_dict["price"]
         priceDiff = int((askPrice - smsPrice) / smsPrice * 100)
         if priceDiff > 5:
@@ -168,10 +199,10 @@ def placeOrder(order_dict):
                 "err": f"${balance} balance insufficient for ${round(size * askPrice, 2)} trade!",
             }
 
+        trade_amount = round(size * askPrice, 2)
+
     if "SELL" in side:
-        if assetType == "OPTION":
-            size = 1
-        else:
+        if assetType != "Monkey":
             try:
                 positions = account_details["securitiesAccount"]["positions"]
                 size = 0
@@ -191,6 +222,8 @@ def placeOrder(order_dict):
                 "err": f"Trade position not found. Balance: ${balance}",
             }
 
+        trade_amount = round(size * bidPrice, 2)
+
     # Initalize a new Order Object.
     newOrder = {
         "complexOrderStrategyType": "NONE",
@@ -208,7 +241,6 @@ def placeOrder(order_dict):
     }
 
     print(newOrder)
-    trade_amount = round(size * askPrice, 2)
     try:
         order_result = TDSession.place_order(account=ACCOUNT_NUMBER, order=newOrder)
         account_details = TDSession.get_accounts(
